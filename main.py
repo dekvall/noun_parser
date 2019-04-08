@@ -3,20 +3,16 @@
 BASE_URL='https://thenounproject.com/browse/?i='
 
 import time
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
 
 from bs4 import BeautifulSoup
 import re
 import base64
 import logging
+import asyncio
+from pyppeteer import launch
+import xml.dom.minidom
+import random
 
-def substring_after(s, delim):
-	return s.partition(delim)[2]
 
 def get_logger(    
 		LOG_FORMAT     = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -46,35 +42,42 @@ def get_logger(
 
 	return log
 
-my_logger = get_logger()
-options = Options()
-options.headless = True
 
-driver = webdriver.Firefox(options=options)
+def substring_after(s, delim):
+	return s.partition(delim)[2]
 
-for pic_num in range(1,100):
-	print('working on id', pic_num)
-	driver.get(BASE_URL+str(pic_num))
-	delay = 6
-	t = time.time()
+async def extract_image(content, num):
+	soup = BeautifulSoup(content, "html5lib")
+	name = soup.select_one('.main-term').string.lower().strip().replace(' ','_')
+	tag = soup.select_one('.iconPreview')
+	pic = substring_after(tag['style'], 'base64,')[:-3]
+
+	svg = base64.b64decode(pic).decode('utf-8')
+	xml_svg = xml.dom.minidom.parseString(svg)
+	pretty_svg = xml_svg.toprettyxml()
+	with open("pics/{:07d}_{}.svg".format(num, name), 'w') as f:
+		f.write(pretty_svg)
+	logger.info(f'{num} {name}')
+
+async def fetch_page(browser, num):
+	print(f'fetching {num}')
 	try:
-		myElem = WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'iconPreview')))
-		html = driver.page_source
-		soup = BeautifulSoup(html, features='lxml')
+		page = await browser.newPage()
+		await page.goto(BASE_URL+str(num), timeout=6*1000)
+		await page.waitForSelector('.iconPreview', timeout=6*1000)
+		content = await page.content()
+		await extract_image(content, num)
+	except:
+		logger.info(f'{num} _timeout_')
 
-		name = soup.select_one('.main-term').string.lower().replace(' ','_')
-		tag = soup.select_one('.iconPreview')
-		pic = substring_after(tag['style'], 'base64,')[:-3]
+async def main():
+	n_calls=6
+	for start in range(163,1000,n_calls):
+		browser = await launch()
+		await asyncio.gather(*[fetch_page(browser, pic_num) for pic_num in range(start,start+n_calls)])
+		await asyncio.sleep(4)
+		await browser.close()
+logger = get_logger()
+loop = asyncio.get_event_loop()
 
-		svg = base64.b64decode(pic).decode('utf-8')
-
-		with open("pics/{:07d}_{}.svg".format(pic_num, name), 'w') as f:
-			f.write(svg)
-		print("Page for {} with id {} was ready in {:.2f} seconds".format(name,pic_num,time.time()-t))
-		my_logger.info("Page for {} with id {} was ready in {:.2f} seconds".format(name,pic_num,time.time()-t))
-	except TimeoutException:
-		print("Loading {} took too much time!".format(pic_num))
-		my_logger.info("Loading {} took too much time!".format(pic_num))
-driver.quit()
-
-#print(p_element.text)
+loop.run_until_complete(main())
