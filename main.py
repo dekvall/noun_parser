@@ -59,7 +59,6 @@ for pic_num in range(1,100):
 	t = time.time()
 	try:
 		myElem = WebDriverWait(driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'iconPreview')))
-		driver.save_screenshot('a.png')
 		html = driver.page_source
 		soup = BeautifulSoup(html, features='lxml')
 
