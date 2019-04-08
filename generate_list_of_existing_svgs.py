@@ -5,6 +5,7 @@ create a csv with number and name
 import glob
 import os
 
+ignore_duplicates = True
 files = glob.glob('pics/*.svg')
 
 vals = []
@@ -18,6 +19,13 @@ for file in files:
 
 vals.sort(key=lambda x: x[0])
 
-for val in vals:
-	num, noun = val
-	print(f'{num},{noun}')
+if not ignore_duplicates:
+	for val in vals:
+		num, noun = val
+		print(f'{num},{noun}')
+else:
+	nouns = [noun for _,noun in vals]
+	no_duplicates = set(nouns)
+
+	for noun in no_duplicates:
+		print(f'{noun}')

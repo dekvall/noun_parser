@@ -60,23 +60,44 @@ async def extract_image(content, num):
 	logger.info(f'{num} {name}')
 
 async def fetch_page(browser, num):
-	print(f'fetching {num}')
+	page = await browser.newPage()
 	try:
-		page = await browser.newPage()
 		await page.goto(BASE_URL+str(num), timeout=6*1000)
 		await page.waitForSelector('.iconPreview', timeout=6*1000)
 		content = await page.content()
 		await extract_image(content, num)
 	except:
 		logger.info(f'{num} _timeout_')
+	finally:
+		await page.close()
 
+async def worker(browser, queue):
+	while True:
+		idx = await queue.get()
+		await fetch_page(browser, idx)
+		queue.task_done()
+
+		print(f'{idx} has been processed')
+		await asyncio.sleep(1)
+	
 async def main():
 	n_calls=6
-	for start in range(163,1000,n_calls):
-		browser = await launch()
-		await asyncio.gather(*[fetch_page(browser, pic_num) for pic_num in range(start,start+n_calls)])
-		await asyncio.sleep(4)
-		await browser.close()
+	s = 4940
+	q = asyncio.Queue()
+	browser = await launch()
+
+	for i in range(s,5000):
+		q.put_nowait(i)
+
+	tasks = [asyncio.create_task(worker(browser, q)) for _ in range(n_calls)]
+
+	await q.join()
+
+	for task in tasks:
+		task.cancel()
+	await asyncio.gather(*tasks, return_exceptions=True)
+	await browser.close()
+
 logger = get_logger()
 loop = asyncio.get_event_loop()
 
