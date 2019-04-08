@@ -63,33 +63,38 @@ async def fetch_page(browser, num):
 	page = await browser.newPage()
 	try:
 		await page.goto(BASE_URL+str(num), timeout=6*1000)
-		await page.waitForSelector('.iconPreview', timeout=6*1000)
-		content = await page.content()
-		await extract_image(content, num)
-	except:
+		raw_content = await page.content()
+		matches = re.findall("<h1>Page Not Found</h1>", raw_content)
+		if not matches:
+			await page.waitForSelector('.iconPreview', timeout=6*1000)
+			content = await page.content()
+			await extract_image(content, num)
+		else:
+			raise Exception(f'Page not found for {num}')
+	except Exception as e:
+		print(e)
 		logger.info(f'{num} _timeout_')
 	finally:
 		await page.close()
 
-async def worker(browser, queue):
+async def worker(name, browser, queue):
 	while True:
 		idx = await queue.get()
 		await fetch_page(browser, idx)
 		queue.task_done()
-
-		print(f'{idx} has been processed')
-		await asyncio.sleep(1)
+		#print(f'{name} completed {idx}')
+		await asyncio.sleep(1.8)
 	
 async def main():
 	n_calls=6
-	s = 4940
+	s = 6286
 	q = asyncio.Queue()
 	browser = await launch()
-
-	for i in range(s,5000):
+	await asyncio.sleep(2)
+	for i in range(s,8000):
 		q.put_nowait(i)
 
-	tasks = [asyncio.create_task(worker(browser, q)) for _ in range(n_calls)]
+	tasks = [asyncio.create_task(worker(f'{_}',browser, q)) for _ in range(n_calls)]
 
 	await q.join()
 

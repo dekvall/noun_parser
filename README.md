@@ -10,5 +10,6 @@ It now reads 6 urls at a time, using an ansynchronos queue to keep track of the 
 Only tested with python 3.7
 
 ## TODO
-Figure out how to not call everything at once
+Create a check for page not found
 Learn proper async
+
