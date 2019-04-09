@@ -62,18 +62,19 @@ async def extract_image(content, num):
 async def fetch_page(browser, num):
 	page = await browser.newPage()
 	try:
-		await page.goto(BASE_URL+str(num), timeout=6*1000)
+		await page.goto(BASE_URL+str(num), timeout=30*1000)
 		raw_content = await page.content()
 		matches = re.findall("<h1>Page Not Found</h1>", raw_content)
 		if not matches:
-			await page.waitForSelector('.iconPreview', timeout=6*1000)
+			await page.waitForSelector('.iconPreview', timeout=30*1000)
 			content = await page.content()
 			await extract_image(content, num)
 		else:
-			raise Exception(f'Page not found for {num}')
+			raise Exception(f'Page not found, {num}')
 	except Exception as e:
 		print(e)
 		logger.info(f'{num} _timeout_')
+		await page.screenshot({'path': f'screenshots/{num}.png'})
 	finally:
 		await page.close()
 
@@ -87,11 +88,11 @@ async def worker(name, browser, queue):
 	
 async def main():
 	n_calls=6
-	s = 6286
+	s = 7412
 	q = asyncio.Queue()
 	browser = await launch()
 	await asyncio.sleep(2)
-	for i in range(s,8000):
+	for i in range(s,10000):
 		q.put_nowait(i)
 
 	tasks = [asyncio.create_task(worker(f'{_}',browser, q)) for _ in range(n_calls)]
